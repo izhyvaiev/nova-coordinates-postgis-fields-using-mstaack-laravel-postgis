@@ -18,6 +18,7 @@ class Longitude extends CoordinateBase
     {
         parent::__construct($name, $attribute, $resolveCallback);
         $this->longitudeKey = $attribute;
-        $this->withMeta(['step' => 0.000001]);
+        $precision = function_exists('config') ? config('postgis.precision', 6) : 6;
+        $this->withMeta(['step' => 1 / pow(10, $precision)]);
     }
 }

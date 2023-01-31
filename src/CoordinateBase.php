@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Laravel\Nova\Fields\Number;
 use Laravel\Nova\Http\Requests\NovaRequest;
+use MStaack\LaravelPostgis\Geometries\Point;
 
 abstract class CoordinateBase extends Number
 {
@@ -188,9 +189,7 @@ abstract class CoordinateBase extends Number
                     if (!is_a($resource, Model::class)) {
                         return null;
                     }
-                    $point = DB::select(DB::raw("SELECT ST_AsText('{$resource->{$this->position}}'::geography) as position"))[0]->position;
-
-                    return explode(' ', Str::between($point, '(', ')'));
+                    return [$resource->{$this->position}->getLng(), $resource->{$this->position}->getLat()];
                 });
     }
 
@@ -214,46 +213,17 @@ abstract class CoordinateBase extends Number
             $longitude = filter_var($request[$this->longitudeKey], FILTER_SANITIZE_NUMBER_FLOAT, FILTER_FLAG_ALLOW_FRACTION);
             $latitude = filter_var($request[$this->latitudeKey], FILTER_SANITIZE_NUMBER_FLOAT, FILTER_FLAG_ALLOW_FRACTION);
 
-            if ($this->dataType === 'geography') {
-                $statement = $this->getGeographyStatement($longitude, $latitude);
-            } elseif ($this->dataType === 'geometry') {
-                $statement = $this->getGeometryStatement($longitude, $latitude);
-            } else {
+            if ($longitude === null && $latitude === null) {
                 return;
             }
-            if ($statement !== null) {
-                $model->{$this->position} = DB::raw($statement);
+            if ($longitude === null) {
+                $longitude = 0;
             }
-        }
-    }
+            if ($latitude === null) {
+                $latitude = 0;
+            }
 
-    public function getGeographyStatement($longitude = null, $latitude = null)
-    {
-        if ($longitude === null && $latitude === null) {
-            return null;
+            $model->{$this->position} = new Point($latitude, $longitude);
         }
-        if ($longitude === null) {
-            $longitude = 0;
-        }
-        if ($latitude === null) {
-            $latitude = 0;
-        }
-
-        return "ST_GeographyFromText('POINT({$longitude} {$latitude})')";
-    }
-
-    public function getGeometryStatement($longitude = null, $latitude = null)
-    {
-        if ($longitude === null && $latitude === null) {
-            return null;
-        }
-        if ($longitude === null) {
-            $longitude = 0;
-        }
-        if ($latitude === null) {
-            $latitude = 0;
-        }
-
-        return "ST_SetSRID(ST_MakePoint({$longitude}, {$latitude}), 4326)";
     }
 }
